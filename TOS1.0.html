@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>抽卡模擬器</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 950px;
+      margin: 20px auto;
+      padding: 0 15px;
+      background-color: #f4f4f9;
+      color: #333;
+    }
+    h1 { text-align: center; }
+    .control-panel {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    
+    /* 保底選擇器 */
+    .pity-select-container {
+      margin-bottom: 20px;
+    }
+    .pity-select-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      display: block;
+    }
+    .pity-options {
+      display: flex;
+      gap: 15px;
+    }
+    .pity-option-card {
+      border: 3px solid #ccc;
+      border-radius: 8px;
+      padding: 6px;
+      cursor: pointer;
+      width: 80px;
+      text-align: center;
+      transition: all 0.2s ease-in-out;
+      background-color: #fff;
+      position: relative;
+    }
+    .pity-option-card:hover {
+      border-color: #007bff;
+      transform: translateY(-2px);
+    }
+    .pity-option-card.selected {
+      border-color: #ffc107;
+      background-color: #fffdf0;
+      box-shadow: 0 0 8px rgba(255, 193, 7, 0.6);
+    }
+    .pity-option-card img {
+      width: 100%;
+      height: auto;
+      border-radius: 4px;
+      display: block;
+    }
+    .pity-option-card .label {
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 4px;
+    }
+    .pity-option-card .selected-badge {
+      display: none;
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #ffc107;
+      color: #000;
+      font-size: 10px;
+      font-weight: bold;
+      padding: 2px 5px;
+      border-radius: 10px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .pity-option-card.selected .selected-badge {
+      display: block;
+    }
+
+    /* 統計看板 */
+    .stats-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      background: #f8f9fa;
+      padding: 12px 15px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 1.05em;
+    }
+    .stat-item { margin-right: 10px; }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-right: 10px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background-color: #007bff;
+      color: white;
+    }
+    button:hover { background-color: #0056b3; }
+    button.reset { background-color: #dc3545; }
+    button.reset:hover { background-color: #a71d2a; }
+
+    /* 抽卡紀錄區塊 */
+    .history-section {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .log-group {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 20px;
+      background-color: #fafafa;
+    }
+    .log-header {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #444;
+      border-bottom: 2px solid #ddd;
+      padding-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .pending-log {
+      border: 1px dashed #007bff;
+      background-color: #f0f7ff;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+      gap: 8px;
+    }
+    .card-item {
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 4px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      position: relative;
+    }
+    .card-item.is-grand-prize {
+      border: 2px solid #ffc107;
+      background-color: #fffdf0;
+    }
+    .card-item.is-target-11262 {
+      border: 2px solid #6f42c1;
+    }
+    .card-item img {
+      width: 100%;
+      height: auto;
+      border-radius: 4px;
+      display: block;
+    }
+    .card-item .id-label {
+      font-size: 11px;
+      margin-top: 3px;
+      font-weight: bold;
+    }
+    .pity-tag {
+      color: #d9534f;
+      font-size: 9px;
+      font-weight: bold;
+      line-height: 1.1;
+      margin-top: 2px;
+    }
+    .early-tag {
+      color: #28a745;
+      font-size: 9px;
+      font-weight: bold;
+      line-height: 1.1;
+      margin-top: 2px;
+    }
+    .tag-11262 {
+      color: #6f42c1;
+      font-size: 9px;
+      font-weight: bold;
+      line-height: 1.1;
+      margin-top: 2px;
+    }
+
+    /* 標題欄位的達標 Badge */
+    .badge-11262-achieved {
+      background-color: #6f42c1;
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin-left: 8px;
+      font-weight: normal;
+    }
+  </style>
+</head>
+<body>
+
+  <h1></h1>
+  <div class="control-panel">
+    <div class="pity-select-container">
+      <span class="pity-select-title">選擇第 35 抽保底大獎（達成第 35 抽時會自動更換）：</span>
+      <div class="pity-options">
+        <div class="pity-option-card selected" id="pityCard11265" onclick="setPityTarget(11265)">
+          <div class="selected-badge">保底中</div>
+          <img src="https://d1h5mn9kk900cf.cloudfront.net/toswebsites/gallery/icons/11265.jpg" alt="11265">
+          <div class="label">11265</div>
+        </div>
+        <div class="pity-option-card" id="pityCard11266" onclick="setPityTarget(11266)">
+          <div class="selected-badge">保底中</div>
+          <img src="https://d1h5mn9kk900cf.cloudfront.net/toswebsites/gallery/icons/11266.jpg" alt="11266">
+          <div class="label">11266</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 統計數據看板 -->
+    <div class="stats-container">
+      <div class="stat-item">累計總抽數：<strong id="totalPulls">0</strong></div>
+      <div class="stat-item">當前輪次進度：<strong id="pityCount">0</strong> / 35</div>
+      <div class="stat-item" style="color: #28a745;">保底前出大獎：<strong id="earlyJackpotCount">0</strong> 次</div>
+      <div class="stat-item" style="color: #d9534f;">保底觸發出大獎：<strong id="pityJackpotCount">0</strong> 次</div>
+    </div>
+
+    <button onclick="draw(1)">單抽</button>
+    <button onclick="draw(10)">10 連抽</button>
+    <button onclick="draw(35)">直接抽滿 35 抽</button>
+    <button class="reset" onclick="resetSim()">重置模擬器</button>
+  </div>
+
+  <div class="history-section">
+    <h2>抽卡歷史紀錄（每 35 抽一筆）</h2>
+    <div id="historyLogs"></div>
+  </div>
+
+  <script>
+    // 卡池概率設定 (源自 pool.json)
+    const pool = [
+      { monsterId: 11264, rate: 0.29666 },
+      { monsterId: 11267, rate: 0.29666 },
+      { monsterId: 11268, rate: 0.29666 },
+      { monsterId: 11262, rate: 0.045 },
+      { monsterId: 11263, rate: 0.045 },
+      { monsterId: 11265, rate: 0.01 },
+      { monsterId: 11266, rate: 0.01 }
+    ];
+
+    let totalPulls = 0;
+    let pityCount = 0;
+    let selectedPity = 11265;
+    
+    let earlyJackpotCount = 0;
+    let pityJackpotCount = 0;
+
+    let historyRecords = [];
+    let currentPendingBatch = [];
+
+    // 設定保底目標
+    function setPityTarget(id) {
+      selectedPity = id;
+      document.querySelectorAll('.pity-option-card').forEach(card => card.classList.remove('selected'));
+      document.getElementById(`pityCard${id}`).classList.add('selected');
+    }
+
+    // 隨機抽取卡片
+    function getRandomMonster() {
+      const rand = Math.random();
+      let cumulative = 0;
+      for (const item of pool) {
+        cumulative += item.rate;
+        if (rand < cumulative) {
+          return item.monsterId;
+        }
+      }
+      return pool[pool.length - 1].monsterId;
+    }
+
+    // 執行抽卡
+    function draw(count) {
+      for (let i = 0; i < count; i++) {
+        totalPulls++;
+        pityCount++;
+
+        let drawnId;
+        let isPityTriggered = false;
+        let isEarlyJackpot = false;
+
+        // 判斷是否為第 35 抽觸發保底
+        if (pityCount === 35) {
+          drawnId = selectedPity;
+          isPityTriggered = true;
+          pityJackpotCount++;
+          pityCount = 0;
+
+          // 第 35 抽達成保底，自動更換為另一個保底目標
+          const nextPityTarget = (selectedPity === 11265) ? 11266 : 11265;
+          setPityTarget(nextPityTarget);
+        } else {
+          drawnId = getRandomMonster();
+          if (drawnId === 11265 || drawnId === 11266) {
+            isEarlyJackpot = true;
+            earlyJackpotCount++;
+          }
+        }
+
+        const cardData = {
+          pullNumber: totalPulls,
+          monsterId: drawnId,
+          isPity: isPityTriggered,
+          isEarly: isEarlyJackpot
+        };
+
+        currentPendingBatch.push(cardData);
+
+        if (currentPendingBatch.length === 35) {
+          historyRecords.unshift({
+            groupIndex: historyRecords.length + 1,
+            cards: [...currentPendingBatch]
+          });
+          currentPendingBatch = [];
+        }
+      }
+
+      updateUI();
+    }
+
+    // 計算指定批次中 11262 的數量
+    function get11262Count(cards) {
+      return cards.filter(card => card.monsterId === 11262).length;
+    }
+
+    // 更新與渲染 UI
+    function updateUI() {
+      document.getElementById("totalPulls").innerText = totalPulls;
+      document.getElementById("pityCount").innerText = pityCount;
+      document.getElementById("earlyJackpotCount").innerText = earlyJackpotCount;
+      document.getElementById("pityJackpotCount").innerText = pityJackpotCount;
+
+      const historyContainer = document.getElementById("historyLogs");
+      historyContainer.innerHTML = "";
+
+      // 1. 渲染進行中輪次
+      if (currentPendingBatch.length > 0) {
+        const startNum = historyRecords.length * 35 + 1;
+        const endNum = totalPulls;
+        const count11262 = get11262Count(currentPendingBatch);
+        const isAchieved = count11262 >= 3;
+
+        const pendingDiv = document.createElement("div");
+        pendingDiv.className = "log-group pending-log";
+        pendingDiv.innerHTML = `
+          <div class="log-header">
+            <span>
+              進行中輪次（第 ${startNum} ~ ${endNum} 抽）
+              ${isAchieved ? `<span class="badge-11262-achieved">🎯 11262 達標 (${count11262}張)</span>` : ''}
+            </span>
+            <span>進度：${currentPendingBatch.length} / 35</span>
+          </div>
+          <div class="card-grid">${renderCardGridHTML(currentPendingBatch)}</div>
+        `;
+        historyContainer.appendChild(pendingDiv);
+      }
+
+      // 2. 渲染已歸檔歷史紀錄
+      historyRecords.forEach(record => {
+        const startNum = (record.groupIndex - 1) * 35 + 1;
+        const endNum = record.groupIndex * 35;
+        const count11262 = get11262Count(record.cards);
+        const isAchieved = count11262 >= 3;
+
+        const logDiv = document.createElement("div");
+        logDiv.className = "log-group";
+        logDiv.innerHTML = `
+          <div class="log-header">
+            <span>
+              第 ${record.groupIndex} 輪紀錄（第 ${startNum} ~ ${endNum} 抽）
+              ${isAchieved ? `<span class="badge-11262-achieved">🎯 11262 達標 (${count11262}張)</span>` : ''}
+            </span>
+            <span>共 35 抽</span>
+          </div>
+          <div class="card-grid">${renderCardGridHTML(record.cards)}</div>
+        `;
+        historyContainer.appendChild(logDiv);
+      });
+    }
+
+    function renderCardGridHTML(cards) {
+      return cards.map(card => {
+        const imgUrl = `https://d1h5mn9kk900cf.cloudfront.net/toswebsites/gallery/icons/${card.monsterId}.jpg`;
+        const isGrand = (card.monsterId === 11265 || card.monsterId === 11266);
+        const is11262 = (card.monsterId === 11262);
+        
+        let tagHTML = '';
+        if (card.isPity) {
+          tagHTML = '<div class="pity-tag">[第35抽保底]</div>';
+        } else if (card.isEarly) {
+          tagHTML = '<div class="early-tag">[提前中大獎]</div>';
+        } else if (is11262) {
+          tagHTML = '<div class="tag-11262">[11262]</div>';
+        }
+
+        let borderClass = '';
+        if (isGrand) borderClass = 'is-grand-prize';
+        else if (is11262) borderClass = 'is-target-11262';
+
+        return `
+          <div class="card-item ${borderClass}">
+            <img src="${imgUrl}" alt="${card.monsterId}" onerror="this.src='https://via.placeholder.com/70?text=${card.monsterId}'">
+            <div class="id-label">${card.monsterId}</div>
+            ${tagHTML}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function resetSim() {
+      if (totalPulls > 0 && !confirm("確定要重置所有抽卡資料與紀錄嗎？")) {
+        return;
+      }
+      totalPulls = 0;
+      pityCount = 0;
+      earlyJackpotCount = 0;
+      pityJackpotCount = 0;
+      historyRecords = [];
+      currentPendingBatch = [];
+      setPityTarget(11265);
+      updateUI();
+    }
+  </script>
+</body>
+</html>

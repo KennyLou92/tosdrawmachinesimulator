@@ -1,0 +1,33 @@
+        {
+            "poolId": "yu-gi-oh",
+            "monsterRates": [
+                {
+                    "monsterId": 11264,
+                    "rate": 0.29666
+                },
+                {
+                    "monsterId": 11267,
+                    "rate": 0.29666
+                },
+                {
+                    "monsterId": 11268,
+                    "rate": 0.29666
+                },
+                {
+                    "monsterId": 11262,
+                    "rate": 0.045
+                },
+                {
+                    "monsterId": 11263,
+                    "rate": 0.045
+                },
+                {
+                    "monsterId": 11265,
+                    "rate": 0.01
+                },
+                {
+                    "monsterId": 11266,
+                    "rate": 0.01
+                }
+            ]
+        },
