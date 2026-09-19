@@ -1,6 +1,6 @@
  [
         {
-            "poolId": "yu-gi-oh",
+            "poolId": "我的回合，抽卡！",
             "monsterRates": [
                 {
                     "monsterId": 11264,
@@ -37,7 +37,7 @@
         },
             
         {
-            "poolId": "blackgold(2026.5)",
+            "poolId": "新星預兆",
             "monsterRates": [
                 {
                     "monsterId": 191,
