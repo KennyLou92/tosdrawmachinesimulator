@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>抽卡模擬器</title>
+  <!-- 避免跨域與防盜鏈導致圖片載入失敗 -->
+  <meta name="referrer" content="no-referrer">
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -22,6 +24,16 @@
       margin-bottom: 20px;
     }
     
+    .pool-select-container {
+      margin-bottom: 15px;
+    }
+    .pool-select-container select {
+      padding: 6px 12px;
+      font-size: 16px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+
     /* 保底選擇器 */
     .pity-select-container {
       margin-bottom: 20px;
@@ -31,9 +43,13 @@
       margin-bottom: 8px;
       display: block;
     }
+    .auto-switch-hint {
+      display: none; /* 預設隱藏，由 selectguaranteemonster 決定是否顯示 */
+    }
     .pity-options {
       display: flex;
       gap: 15px;
+      flex-wrap: wrap;
     }
     .pity-option-card {
       border: 3px solid #ccc;
@@ -100,6 +116,7 @@
       padding: 10px 20px;
       font-size: 16px;
       margin-right: 10px;
+      margin-bottom: 5px;
       cursor: pointer;
       border: none;
       border-radius: 4px;
@@ -209,56 +226,51 @@
 
   <h1></h1>
   <div class="control-panel">
+    <!-- 切換卡池 -->
+    <div class="pool-select-container">
+      <label for="poolSelect"><b>選擇卡池：</b></label>
+      <select id="poolSelect" onchange="onPoolChange()">
+        <!-- 動態載入卡池列表 -->
+      </select>
+    </div>
+
     <div class="pity-select-container">
-      <span class="pity-select-title">選擇第 35 抽保底大獎（達成第 35 抽時會自動更換）：</span>
-      <div class="pity-options">
-        <div class="pity-option-card selected" id="pityCard11265" onclick="setPityTarget(11265)">
-          <div class="selected-badge">保底中</div>
-          <img src="https://d1h5mn9kk900cf.cloudfront.net/toswebsites/gallery/icons/11265.jpg" alt="11265">
-          <div class="label">11265</div>
-        </div>
-        <div class="pity-option-card" id="pityCard11266" onclick="setPityTarget(11266)">
-          <div class="selected-badge">保底中</div>
-          <img src="https://d1h5mn9kk900cf.cloudfront.net/toswebsites/gallery/icons/11266.jpg" alt="11266">
-          <div class="label">11266</div>
-        </div>
-      </div>
+      <span class="pity-select-title">
+        選擇第 <span class="max-pity-text">35</span> 抽保底大獎<span id="autoSwitchHint" class="auto-switch-hint">（達成第 <span class="max-pity-text">35</span> 抽時會自動更換）</span>：
+      </span>
+      <div class="pity-options" id="pityOptions"></div>
     </div>
 
     <!-- 統計數據看板 -->
     <div class="stats-container">
       <div class="stat-item">累計總抽數：<strong id="totalPulls">0</strong></div>
-      <div class="stat-item">當前輪次進度：<strong id="pityCount">0</strong> / 35</div>
+      <div class="stat-item">當前輪次進度：<strong id="pityCount">0</strong> / <span class="max-pity-text">35</span></div>
       <div class="stat-item" style="color: #28a745;">保底前出大獎：<strong id="earlyJackpotCount">0</strong> 次</div>
       <div class="stat-item" style="color: #d9534f;">保底觸發出大獎：<strong id="pityJackpotCount">0</strong> 次</div>
     </div>
 
     <button onclick="draw(1)">單抽</button>
     <button onclick="draw(10)">10 連抽</button>
-    <button onclick="draw(35)">直接抽滿 35 抽</button>
     <button class="reset" onclick="resetSim()">重置模擬器</button>
   </div>
 
   <div class="history-section">
-    <h2>抽卡歷史紀錄（每 35 抽一筆）</h2>
+    <h2>抽卡歷史紀錄（每 <span class="max-pity-text">35</span> 抽一筆）</h2>
     <div id="historyLogs"></div>
   </div>
 
   <script>
-    // 卡池概率設定 (源自 pool.json)
-    const pool = [
-      { monsterId: 11264, rate: 0.29666 },
-      { monsterId: 11267, rate: 0.29666 },
-      { monsterId: 11268, rate: 0.29666 },
-      { monsterId: 11262, rate: 0.045 },
-      { monsterId: 11263, rate: 0.045 },
-      { monsterId: 11265, rate: 0.01 },
-      { monsterId: 11266, rate: 0.01 }
-    ];
+    let poolData = [];
+    let currentPool = null;
+    let poolRates = [];
+    
+    let guaranteeCount = 35;
+    let guaranteeMonsterList = [];
+    let selectedPity = null;
+    let autoSwitchEnabled = false;
 
     let totalPulls = 0;
     let pityCount = 0;
-    let selectedPity = 11265;
     
     let earlyJackpotCount = 0;
     let pityJackpotCount = 0;
@@ -266,27 +278,102 @@
     let historyRecords = [];
     let currentPendingBatch = [];
 
+    // 自動轉為 4 位數檔名的圖片網址 (如 191 -> 0191.jpg)
+    function getMonsterImgUrl(id) {
+      const paddedId = String(id).padStart(4, '0');
+      return `https://d1h5mn9kk900cf.cloudfront.net/toswebsites/gallery/icons/${paddedId}.jpg`;
+    }
+
+    // 初始化讀取 pool.json
+    async function init() {
+      try {
+        const response = await fetch('pool.json');
+        poolData = await response.json();
+        
+        const poolSelect = document.getElementById('poolSelect');
+        poolSelect.innerHTML = poolData.map((pool, idx) => 
+          `<option value="${idx}">${pool.poolId}</option>`
+        ).join('');
+
+        loadPool(0);
+      } catch (err) {
+        console.error('載入 pool.json 失敗:', err);
+      }
+    }
+
+    function onPoolChange() {
+      const idx = document.getElementById('poolSelect').value;
+      loadPool(idx);
+      resetSim(true);
+    }
+
+    function loadPool(index) {
+      currentPool = poolData[index];
+      poolRates = currentPool.monsterRates || currentPool.rates || [];
+      guaranteeCount = currentPool.guaranteecount || 35;
+      autoSwitchEnabled = (currentPool.selectguaranteemonster === true);
+
+      // 解析保底怪獸列表 (相容字串、數字陣列)
+      if (typeof currentPool.guaranteemonster === 'string') {
+        guaranteeMonsterList = currentPool.guaranteemonster.split(',').map(id => parseInt(id.trim(), 10));
+      } else if (Array.isArray(currentPool.guaranteemonster)) {
+        guaranteeMonsterList = currentPool.guaranteemonster.map(id => Number(id));
+      } else {
+        guaranteeMonsterList = [Number(currentPool.guaranteemonster)];
+      }
+
+      selectedPity = guaranteeMonsterList[0] || null;
+
+      // 動態更新 UI 上的 N 抽文字
+      document.querySelectorAll('.max-pity-text').forEach(el => el.innerText = guaranteeCount);
+
+      // 根據 selectguaranteemonster 決定是否顯示自動更換提示
+      const hintEl = document.getElementById('autoSwitchHint');
+      if (hintEl) {
+        hintEl.style.display = autoSwitchEnabled ? 'inline' : 'none';
+      }
+
+      renderPityOptions();
+    }
+
+    function renderPityOptions() {
+      const container = document.getElementById("pityOptions");
+      if (!container) return;
+
+      container.innerHTML = guaranteeMonsterList.map(id => {
+        const imgUrl = getMonsterImgUrl(id);
+        const isSelected = (id === selectedPity) ? 'selected' : '';
+
+        return `
+          <div class="pity-option-card ${isSelected}" id="pityCard${id}" onclick="setPityTarget(${id})">
+            <div class="selected-badge">保底中</div>
+            <img src="${imgUrl}" alt="${id}">
+            <div class="label">${id}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
     // 設定保底目標
     function setPityTarget(id) {
       selectedPity = id;
-      document.querySelectorAll('.pity-option-card').forEach(card => card.classList.remove('selected'));
-      document.getElementById(`pityCard${id}`).classList.add('selected');
+      renderPityOptions();
     }
 
     // 隨機抽取卡片
     function getRandomMonster() {
       const rand = Math.random();
       let cumulative = 0;
-      for (const item of pool) {
+      for (const item of poolRates) {
         cumulative += item.rate;
         if (rand < cumulative) {
           return item.monsterId;
         }
       }
-      return pool[pool.length - 1].monsterId;
+      return poolRates[poolRates.length - 1].monsterId;
     }
 
-    // 執行抽卡
+    // 執行抽卡（完全原汁原味邏輯）
     function draw(count) {
       for (let i = 0; i < count; i++) {
         totalPulls++;
@@ -296,19 +383,23 @@
         let isPityTriggered = false;
         let isEarlyJackpot = false;
 
-        // 判斷是否為第 35 抽觸發保底
-        if (pityCount === 35) {
+        // 判斷是否為第 N 抽觸發保底
+        if (pityCount === guaranteeCount) {
           drawnId = selectedPity;
           isPityTriggered = true;
           pityJackpotCount++;
           pityCount = 0;
 
-          // 第 35 抽達成保底，自動更換為另一個保底目標
-          const nextPityTarget = (selectedPity === 11265) ? 11266 : 11265;
-          setPityTarget(nextPityTarget);
+          // 只有當 selectguaranteemonster === true 且有多個保底目標時，才自動切換
+          if (autoSwitchEnabled && guaranteeMonsterList.length > 1) {
+            const currentIndex = guaranteeMonsterList.indexOf(selectedPity);
+            const nextIndex = (currentIndex + 1) % guaranteeMonsterList.length;
+            setPityTarget(guaranteeMonsterList[nextIndex]);
+          }
         } else {
           drawnId = getRandomMonster();
-          if (drawnId === 11265 || drawnId === 11266) {
+          // 判斷是否提前抽到保底大獎之一
+          if (guaranteeMonsterList.includes(drawnId)) {
             isEarlyJackpot = true;
             earlyJackpotCount++;
           }
@@ -323,7 +414,8 @@
 
         currentPendingBatch.push(cardData);
 
-        if (currentPendingBatch.length === 35) {
+        // 滿 1 輪 (guaranteeCount) 後歸檔
+        if (currentPendingBatch.length === guaranteeCount) {
           historyRecords.unshift({
             groupIndex: historyRecords.length + 1,
             cards: [...currentPendingBatch]
@@ -352,7 +444,7 @@
 
       // 1. 渲染進行中輪次
       if (currentPendingBatch.length > 0) {
-        const startNum = historyRecords.length * 35 + 1;
+        const startNum = historyRecords.length * guaranteeCount + 1;
         const endNum = totalPulls;
         const count11262 = get11262Count(currentPendingBatch);
         const isAchieved = count11262 >= 3;
@@ -365,7 +457,7 @@
               進行中輪次（第 ${startNum} ~ ${endNum} 抽）
               ${isAchieved ? `<span class="badge-11262-achieved">🎯 11262 達標 (${count11262}張)</span>` : ''}
             </span>
-            <span>進度：${currentPendingBatch.length} / 35</span>
+            <span>進度：${currentPendingBatch.length} / ${guaranteeCount}</span>
           </div>
           <div class="card-grid">${renderCardGridHTML(currentPendingBatch)}</div>
         `;
@@ -374,8 +466,8 @@
 
       // 2. 渲染已歸檔歷史紀錄
       historyRecords.forEach(record => {
-        const startNum = (record.groupIndex - 1) * 35 + 1;
-        const endNum = record.groupIndex * 35;
+        const startNum = (record.groupIndex - 1) * guaranteeCount + 1;
+        const endNum = record.groupIndex * guaranteeCount;
         const count11262 = get11262Count(record.cards);
         const isAchieved = count11262 >= 3;
 
@@ -387,7 +479,7 @@
               第 ${record.groupIndex} 輪紀錄（第 ${startNum} ~ ${endNum} 抽）
               ${isAchieved ? `<span class="badge-11262-achieved">🎯 11262 達標 (${count11262}張)</span>` : ''}
             </span>
-            <span>共 35 抽</span>
+            <span>共 ${guaranteeCount} 抽</span>
           </div>
           <div class="card-grid">${renderCardGridHTML(record.cards)}</div>
         `;
@@ -397,13 +489,13 @@
 
     function renderCardGridHTML(cards) {
       return cards.map(card => {
-        const imgUrl = `https://d1h5mn9kk900cf.cloudfront.net/toswebsites/gallery/icons/${card.monsterId}.jpg`;
-        const isGrand = (card.monsterId === 11265 || card.monsterId === 11266);
+        const imgUrl = getMonsterImgUrl(card.monsterId);
+        const isGrand = guaranteeMonsterList.includes(card.monsterId);
         const is11262 = (card.monsterId === 11262);
         
         let tagHTML = '';
         if (card.isPity) {
-          tagHTML = '<div class="pity-tag">[第35抽保底]</div>';
+          tagHTML = `<div class="pity-tag">[第${guaranteeCount}抽保底]</div>`;
         } else if (card.isEarly) {
           tagHTML = '<div class="early-tag">[提前中大獎]</div>';
         } else if (is11262) {
@@ -416,7 +508,7 @@
 
         return `
           <div class="card-item ${borderClass}">
-            <img src="${imgUrl}" alt="${card.monsterId}" onerror="this.src='https://via.placeholder.com/70?text=${card.monsterId}'">
+            <img src="${imgUrl}" alt="${card.monsterId}">
             <div class="id-label">${card.monsterId}</div>
             ${tagHTML}
           </div>
@@ -424,8 +516,8 @@
       }).join('');
     }
 
-    function resetSim() {
-      if (totalPulls > 0 && !confirm("確定要重置所有抽卡資料與紀錄嗎？")) {
+    function resetSim(skipConfirm = false) {
+      if (!skipConfirm && totalPulls > 0 && !confirm("確定要重置所有抽卡資料與紀錄嗎？")) {
         return;
       }
       totalPulls = 0;
@@ -434,9 +526,13 @@
       pityJackpotCount = 0;
       historyRecords = [];
       currentPendingBatch = [];
-      setPityTarget(11265);
+      if (guaranteeMonsterList.length > 0) {
+        setPityTarget(guaranteeMonsterList[0]);
+      }
       updateUI();
     }
+
+    window.onload = init;
   </script>
 </body>
 </html>
