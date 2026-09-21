@@ -158,7 +158,7 @@
 
     .card-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+      grid-template-columns: repeat(10, 1fr); /* 每行顯示 10 個 */
       gap: 8px;
     }
     .card-item {
@@ -174,8 +174,9 @@
       border: 2px solid #ffc107;
       background-color: #fffdf0;
     }
-    .card-item.is-target-11262 {
-      border: 2px solid #6f42c1;
+    .card-item.is-partner {
+      border: 2px solid #6f42c1; /* 紫色框 */
+      background-color: #f8f0ff;
     }
     .card-item img {
       width: 100%;
@@ -202,7 +203,7 @@
       line-height: 1.1;
       margin-top: 2px;
     }
-    .tag-11262 {
+    .tag-partner {
       color: #6f42c1;
       font-size: 9px;
       font-weight: bold;
@@ -266,6 +267,7 @@
     
     let guaranteeCount = 35;
     let guaranteeMonsterList = [];
+    let partnerList = []; // partner 列表
     let selectedPity = null;
     let autoSwitchEnabled = false;
 
@@ -322,6 +324,19 @@
         guaranteeMonsterList = [Number(currentPool.guaranteemonster)];
       }
 
+      // 解析 partner 列表 (相容字串、數字陣列)
+      if (currentPool.partner) {
+        if (typeof currentPool.partner === 'string') {
+          partnerList = currentPool.partner.split(',').map(id => parseInt(id.trim(), 10));
+        } else if (Array.isArray(currentPool.partner)) {
+          partnerList = currentPool.partner.map(id => Number(id));
+        } else {
+          partnerList = [Number(currentPool.partner)];
+        }
+      } else {
+        partnerList = [];
+      }
+
       selectedPity = guaranteeMonsterList[0] || null;
 
       // 動態更新 UI 上的 N 抽文字
@@ -373,7 +388,7 @@
       return poolRates[poolRates.length - 1].monsterId;
     }
 
-    // 執行抽卡（完全原汁原味邏輯）
+    // 執行抽卡
     function draw(count) {
       for (let i = 0; i < count; i++) {
         totalPulls++;
@@ -491,20 +506,23 @@
       return cards.map(card => {
         const imgUrl = getMonsterImgUrl(card.monsterId);
         const isGrand = guaranteeMonsterList.includes(card.monsterId);
-        const is11262 = (card.monsterId === 11262);
+        const isPartner = partnerList.includes(card.monsterId);
         
         let tagHTML = '';
         if (card.isPity) {
           tagHTML = `<div class="pity-tag">[第${guaranteeCount}抽保底]</div>`;
         } else if (card.isEarly) {
           tagHTML = '<div class="early-tag">[提前中大獎]</div>';
-        } else if (is11262) {
-          tagHTML = '<div class="tag-11262">[11262]</div>';
+        } else if (isPartner) {
+          tagHTML = '<div class="tag-partner">[陪跑員]</div>';
         }
 
         let borderClass = '';
-        if (isGrand) borderClass = 'is-grand-prize';
-        else if (is11262) borderClass = 'is-target-11262';
+        if (isGrand) {
+          borderClass = 'is-grand-prize';
+        } else if (isPartner) {
+          borderClass = 'is-partner'; // 套用紫色框
+        }
 
         return `
           <div class="card-item ${borderClass}">
