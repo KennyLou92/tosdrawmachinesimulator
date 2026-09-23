@@ -35,7 +35,42 @@
             "guaranteemonster" : "11265,11266",
             "selectguaranteemonster" : true
         },
-            
+        {
+            "poolId": "相信卡牌的心 - 遊戲王機率提升",
+            "monsterRates": [
+                {
+                    "monsterId": 11264,
+                    "rate": 0.25333
+                },
+                {
+                    "monsterId": 11267,
+                    "rate": 0.25333
+                },
+                {
+                    "monsterId": 11268,
+                    "rate": 0.25333
+                },
+                {
+                    "monsterId": 11262,
+                    "rate": 0.1
+                },
+                {
+                    "monsterId": 11263,
+                    "rate": 0.1
+                },
+                {
+                    "monsterId": 11265,
+                    "rate": 0.02
+                },
+                {
+                    "monsterId": 11266,
+                    "rate": 0.02
+                }
+            ],
+			"guaranteecount" : 35,
+            "guaranteemonster" : "11265,11266",
+            "selectguaranteemonster" : true
+        },
         {
             "poolId": "新星預兆",
             "monsterRates": [
