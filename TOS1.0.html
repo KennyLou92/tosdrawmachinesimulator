@@ -150,15 +150,18 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
     }
     .pending-log {
       border: 1px dashed #007bff;
       background-color: #f0f7ff;
     }
 
+    /* 修正跑位問題：改用自動彈性寬度 Grid */
     .card-grid {
       display: grid;
-      grid-template-columns: repeat(10, 1fr); /* 每行顯示 10 個 */
+      grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
       gap: 8px;
     }
     .card-item {
@@ -169,6 +172,11 @@
       text-align: center;
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
       position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      box-sizing: border-box;
     }
     .card-item.is-grand-prize {
       border: 2px solid #ffc107;
@@ -189,27 +197,18 @@
       margin-top: 3px;
       font-weight: bold;
     }
-    .pity-tag {
-      color: #d9534f;
+    
+    /* 標籤對齊與字體縮小 */
+    .card-tag {
       font-size: 9px;
       font-weight: bold;
       line-height: 1.1;
       margin-top: 2px;
+      word-break: break-all;
     }
-    .early-tag {
-      color: #28a745;
-      font-size: 9px;
-      font-weight: bold;
-      line-height: 1.1;
-      margin-top: 2px;
-    }
-    .tag-partner {
-      color: #6f42c1;
-      font-size: 9px;
-      font-weight: bold;
-      line-height: 1.1;
-      margin-top: 2px;
-    }
+    .pity-tag { color: #d9534f; }
+    .early-tag { color: #28a745; }
+    .tag-partner { color: #6f42c1; }
 
     /* 標題欄位的達標 Badge */
     .badge-11262-achieved {
@@ -220,6 +219,7 @@
       border-radius: 12px;
       margin-left: 8px;
       font-weight: normal;
+      display: inline-block;
     }
   </style>
 </head>
@@ -510,11 +510,11 @@
         
         let tagHTML = '';
         if (card.isPity) {
-          tagHTML = `<div class="pity-tag">[第${guaranteeCount}抽保底]</div>`;
+          tagHTML = `<div class="card-tag pity-tag">[保底]</div>`;
         } else if (card.isEarly) {
-          tagHTML = '<div class="early-tag">[提前中大獎]</div>';
+          tagHTML = '<div class="card-tag early-tag">[大獎]</div>';
         } else if (isPartner) {
-          tagHTML = '<div class="tag-partner">[陪跑員]</div>';
+          tagHTML = '<div class="card-tag tag-partner">[陪跑員]</div>';
         }
 
         let borderClass = '';
