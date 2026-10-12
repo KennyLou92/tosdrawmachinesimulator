@@ -1,5 +1,69 @@
  [
         {
+            "poolId": "祝福聖泉 I",
+            "monsterRates": [
+                {
+                    "monsterId": 11227,
+                    "rate": 0.2325
+                },
+                {
+                    "monsterId": 11228,
+                    "rate": 0.2325
+                },
+                {
+                    "monsterId": 11230,
+                    "rate": 0.2325
+                },
+                {
+                    "monsterId": 11232,
+                    "rate": 0.2325
+                },
+                {
+                    "monsterId": 11229,
+                    "rate": 0.06
+                },
+                {
+                    "monsterId": 11231,
+                    "rate": 0.01
+                }
+            ],
+            "guaranteecount" : 30,
+            "guaranteemonster" : "11229,11231",
+            "selectguaranteemonster" : true
+        },
+        {
+            "poolId": "祝福聖泉 II",
+            "monsterRates": [
+                {
+                    "monsterId": 11290,
+                    "rate": 0.2325
+                },
+                {
+                    "monsterId": 11291,
+                    "rate": 0.2325
+                },
+                {
+                    "monsterId": 11292,
+                    "rate": 0.2325
+                },
+                {
+                    "monsterId": 11293,
+                    "rate": 0.2325
+                },
+                {
+                    "monsterId": 11288,
+                    "rate": 0.01
+                },
+                {
+                    "monsterId": 11289,
+                    "rate": 0.06
+                }
+            ],
+            "guaranteecount" : 30,
+            "guaranteemonster" : "11288,11289",
+            "selectguaranteemonster" : true
+        },
+        {
             "poolId": "我的回合，抽卡！",
             "monsterRates": [
                 {
