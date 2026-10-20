@@ -237,7 +237,8 @@
 
     <div class="pity-select-container" id="pitySelectContainer">
       <span class="pity-select-title">
-        選擇第 <span class="max-pity-text">35</span> 抽保底大獎<span id="autoSwitchHint" class="auto-switch-hint">（達成第 <span class="max-pity-text">35</span> 抽時會自動更換）</span>：
+        <span id="pityTitleNormal">選擇第 <span class="max-pity-text">35</span> 抽保底大獎<span id="autoSwitchHint" class="auto-switch-hint">（達成第 <span class="max-pity-text">35</span> 抽時會自動更換）</span>：</span>
+        <span id="pityTitleNoPity" style="display:none;">本期大獎（無保底）：</span>
       </span>
       <div class="pity-options" id="pityOptions"></div>
     </div>
@@ -371,7 +372,10 @@
         const el = document.getElementById(id);
         if (el) el.style.display = on ? display : 'none';
       };
-      show('pitySelectContainer', hasPity);
+      // 無保底但有大獎時，仍顯示大獎卡片（僅展示，不可選）
+      show('pitySelectContainer', hasPity || guaranteeMonsterList.length > 0);
+      show('pityTitleNormal', hasPity, 'inline');
+      show('pityTitleNoPity', !hasPity, 'inline');
       show('pityProgressItem', hasPity);
       show('pityJackpotItem', hasPity);
       const earlyLabel = document.getElementById('earlyLabel');
@@ -392,10 +396,11 @@
 
       container.innerHTML = guaranteeMonsterList.map(id => {
         const imgUrl = getMonsterImgUrl(id);
-        const isSelected = (id === selectedPity) ? 'selected' : '';
+        const isSelected = (hasPity && id === selectedPity) ? 'selected' : '';
+        const clickAttr = hasPity ? `onclick="setPityTarget(${id})"` : 'style="cursor:default;"';
 
         return `
-          <div class="pity-option-card ${isSelected}" id="pityCard${id}" onclick="setPityTarget(${id})">
+          <div class="pity-option-card ${isSelected}" id="pityCard${id}" ${clickAttr}>
             <div class="selected-badge">保底中</div>
             <img src="${imgUrl}" alt="${id}">
             <div class="label">${id}</div>
