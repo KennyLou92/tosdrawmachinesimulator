@@ -1515,7 +1515,7 @@
                 }
             ],
 			"guaranteecount" : 0,
-            "guaranteemonster" : "",
+            "guaranteemonster" : "11128,11129,11247",
             "selectguaranteemonster" : false
         }
     ]
