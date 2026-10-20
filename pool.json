@@ -1,6 +1,7 @@
  [
         {
             "poolId": "祝福聖泉 I",
+            "show": 1,
             "monsterRates": [
                 {
                     "monsterId": 11227,
@@ -33,6 +34,7 @@
         },
         {
             "poolId": "祝福聖泉 II",
+            "show": 1,
             "monsterRates": [
                 {
                     "monsterId": 11290,
@@ -65,6 +67,7 @@
         },
         {
             "poolId": "我的回合，抽卡！",
+            "show": 0,
             "monsterRates": [
                 {
                     "monsterId": 11264,
@@ -101,6 +104,7 @@
         },
         {
             "poolId": "相信卡牌的心 - 遊戲王機率提升",
+            "show": 0,
             "monsterRates": [
                 {
                     "monsterId": 11264,
@@ -137,6 +141,7 @@
         },
         {
             "poolId": "新星預兆",
+            "show": 1,
             "monsterRates": [
                 {
                     "monsterId": 191,

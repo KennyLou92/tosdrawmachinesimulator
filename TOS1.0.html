@@ -235,7 +235,7 @@
       </select>
     </div>
 
-    <div class="pity-select-container">
+    <div class="pity-select-container" id="pitySelectContainer">
       <span class="pity-select-title">
         選擇第 <span class="max-pity-text">35</span> 抽保底大獎<span id="autoSwitchHint" class="auto-switch-hint">（達成第 <span class="max-pity-text">35</span> 抽時會自動更換）</span>：
       </span>
@@ -245,9 +245,9 @@
     <!-- 統計數據看板 -->
     <div class="stats-container">
       <div class="stat-item">累計總抽數：<strong id="totalPulls">0</strong></div>
-      <div class="stat-item">當前輪次進度：<strong id="pityCount">0</strong> / <span class="max-pity-text">35</span></div>
-      <div class="stat-item" style="color: #28a745;">保底前出大獎：<strong id="earlyJackpotCount">0</strong> 次</div>
-      <div class="stat-item" style="color: #d9534f;">保底觸發出大獎：<strong id="pityJackpotCount">0</strong> 次</div>
+      <div class="stat-item" id="pityProgressItem">當前輪次進度：<strong id="pityCount">0</strong> / <span class="max-pity-text">35</span></div>
+      <div class="stat-item" style="color: #28a745;"><span id="earlyLabel">保底前出大獎</span>：<strong id="earlyJackpotCount">0</strong> 次</div>
+      <div class="stat-item" id="pityJackpotItem" style="color: #d9534f;">保底觸發出大獎：<strong id="pityJackpotCount">0</strong> 次</div>
     </div>
 
     <button onclick="draw(1)">單抽</button>
@@ -256,7 +256,7 @@
   </div>
 
   <div class="history-section">
-    <h2>抽卡紀錄（每 <span class="max-pity-text">35</span> 抽一筆）</h2>
+    <h2>抽卡紀錄（每 <span class="batch-size-text">35</span> 抽一筆）</h2>
     <div id="historyLogs"></div>
   </div>
 
@@ -266,6 +266,9 @@
     let poolRates = [];
     
     let guaranteeCount = 35;
+    let hasPity = true;       // guaranteecount > 0 才有保底
+    let batchSize = 35;       // 紀錄分組大小（無保底時使用 NO_PITY_BATCH_SIZE）
+    const NO_PITY_BATCH_SIZE = 10;
     let guaranteeMonsterList = [];
     let partnerList = []; // partner 列表
     let selectedPity = null;
@@ -293,11 +296,22 @@
         poolData = await response.json();
         
         const poolSelect = document.getElementById('poolSelect');
-        poolSelect.innerHTML = poolData.map((pool, idx) => 
+        // show: 0 → 不顯示；show: 1 或未設定 → 顯示（option 的 value 保留原始索引）
+        const visible = poolData
+          .map((pool, idx) => ({ pool, idx }))
+          .filter(({ pool }) => Number(pool.show ?? 1) !== 0);
+
+        if (visible.length === 0) {
+          poolSelect.innerHTML = '<option value="">（沒有可顯示的卡池）</option>';
+          console.warn('pool.json 中沒有 show 不為 0 的卡池');
+          return;
+        }
+
+        poolSelect.innerHTML = visible.map(({ pool, idx }) => 
           `<option value="${idx}">${pool.poolId}</option>`
         ).join('');
 
-        loadPool(0);
+        loadPool(visible[0].idx);
       } catch (err) {
         console.error('載入 pool.json 失敗:', err);
       }
@@ -305,24 +319,33 @@
 
     function onPoolChange() {
       const idx = document.getElementById('poolSelect').value;
-      loadPool(idx);
+      if (idx === '') return;
+      loadPool(Number(idx));
       resetSim(true);
     }
 
     function loadPool(index) {
       currentPool = poolData[index];
       poolRates = currentPool.monsterRates || currentPool.rates || [];
-      guaranteeCount = currentPool.guaranteecount || 35;
-      autoSwitchEnabled = (currentPool.selectguaranteemonster === true);
+      // guaranteecount: 0 → 沒有保底；未設定時沿用預設 35
+      const gc = Number(currentPool.guaranteecount ?? 35);
+      guaranteeCount = (Number.isFinite(gc) && gc > 0) ? Math.floor(gc) : 0;
+      hasPity = guaranteeCount > 0;
+      batchSize = hasPity ? guaranteeCount : NO_PITY_BATCH_SIZE;
+      autoSwitchEnabled = hasPity && (currentPool.selectguaranteemonster === true);
 
-      // 解析保底怪獸列表 (相容字串、數字陣列)
-      if (typeof currentPool.guaranteemonster === 'string') {
-        guaranteeMonsterList = currentPool.guaranteemonster.split(',').map(id => parseInt(id.trim(), 10));
-      } else if (Array.isArray(currentPool.guaranteemonster)) {
-        guaranteeMonsterList = currentPool.guaranteemonster.map(id => Number(id));
+      // 解析保底怪獸列表 (相容字串、數字陣列、未設定)
+      const gm = currentPool.guaranteemonster;
+      if (typeof gm === 'string') {
+        guaranteeMonsterList = gm.split(',').map(id => parseInt(id.trim(), 10));
+      } else if (Array.isArray(gm)) {
+        guaranteeMonsterList = gm.map(id => Number(id));
+      } else if (gm !== undefined && gm !== null) {
+        guaranteeMonsterList = [Number(gm)];
       } else {
-        guaranteeMonsterList = [Number(currentPool.guaranteemonster)];
+        guaranteeMonsterList = [];
       }
+      guaranteeMonsterList = guaranteeMonsterList.filter(id => Number.isFinite(id));
 
       // 解析 partner 列表 (相容字串、數字陣列)
       if (currentPool.partner) {
@@ -341,6 +364,18 @@
 
       // 動態更新 UI 上的 N 抽文字
       document.querySelectorAll('.max-pity-text').forEach(el => el.innerText = guaranteeCount);
+      document.querySelectorAll('.batch-size-text').forEach(el => el.innerText = batchSize);
+
+      // 沒有保底時，隱藏保底相關 UI
+      const show = (id, on, display = '') => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = on ? display : 'none';
+      };
+      show('pitySelectContainer', hasPity);
+      show('pityProgressItem', hasPity);
+      show('pityJackpotItem', hasPity);
+      const earlyLabel = document.getElementById('earlyLabel');
+      if (earlyLabel) earlyLabel.innerText = hasPity ? '保底前出大獎' : '出大獎';
 
       // 根據 selectguaranteemonster 決定是否顯示自動更換提示
       const hintEl = document.getElementById('autoSwitchHint');
@@ -392,14 +427,14 @@
     function draw(count) {
       for (let i = 0; i < count; i++) {
         totalPulls++;
-        pityCount++;
+        if (hasPity) pityCount++;
 
         let drawnId;
         let isPityTriggered = false;
         let isEarlyJackpot = false;
 
         // 判斷是否為第 N 抽觸發保底
-        if (pityCount === guaranteeCount) {
+        if (hasPity && selectedPity !== null && pityCount === guaranteeCount) {
           drawnId = selectedPity;
           isPityTriggered = true;
           pityJackpotCount++;
@@ -430,7 +465,7 @@
         currentPendingBatch.push(cardData);
 
         // 滿 1 輪 (guaranteeCount) 後歸檔
-        if (currentPendingBatch.length === guaranteeCount) {
+        if (currentPendingBatch.length === batchSize) {
           historyRecords.unshift({
             groupIndex: historyRecords.length + 1,
             cards: [...currentPendingBatch]
@@ -459,7 +494,7 @@
 
       // 1. 渲染進行中輪次
       if (currentPendingBatch.length > 0) {
-        const startNum = historyRecords.length * guaranteeCount + 1;
+        const startNum = historyRecords.length * batchSize + 1;
         const endNum = totalPulls;
         const count11262 = get11262Count(currentPendingBatch);
         const isAchieved = count11262 >= 3;
@@ -472,7 +507,7 @@
               進行中輪次（第 ${startNum} ~ ${endNum} 抽）
               ${isAchieved ? `<span class="badge-11262-achieved">🎯 11262 達標 (${count11262}張)</span>` : ''}
             </span>
-            <span>進度：${currentPendingBatch.length} / ${guaranteeCount}</span>
+            <span>進度：${currentPendingBatch.length} / ${batchSize}</span>
           </div>
           <div class="card-grid">${renderCardGridHTML(currentPendingBatch)}</div>
         `;
@@ -481,8 +516,8 @@
 
       // 2. 渲染已歸檔歷史紀錄
       historyRecords.forEach(record => {
-        const startNum = (record.groupIndex - 1) * guaranteeCount + 1;
-        const endNum = record.groupIndex * guaranteeCount;
+        const startNum = (record.groupIndex - 1) * batchSize + 1;
+        const endNum = record.groupIndex * batchSize;
         const count11262 = get11262Count(record.cards);
         const isAchieved = count11262 >= 3;
 
@@ -494,7 +529,7 @@
               第 ${record.groupIndex} 輪紀錄（第 ${startNum} ~ ${endNum} 抽）
               ${isAchieved ? `<span class="badge-11262-achieved">🎯 11262 達標 (${count11262}張)</span>` : ''}
             </span>
-            <span>共 ${guaranteeCount} 抽</span>
+            <span>共 ${batchSize} 抽</span>
           </div>
           <div class="card-grid">${renderCardGridHTML(record.cards)}</div>
         `;
