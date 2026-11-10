@@ -141,7 +141,7 @@
         },
 {
             "poolId": "深淵祭臺",
-            "show": 0,
+            "show": 1,
             "monsterRates": [
                 {
                     "monsterId": 191,
