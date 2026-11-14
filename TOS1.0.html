@@ -210,6 +210,15 @@
     .early-tag { color: #28a745; }
     .tag-partner { color: #6f42c1; }
 
+    .log-right { display: flex; align-items: center; gap: 10px; }
+    .flip-all-btn {
+      padding: 3px 10px;
+      font-size: 13px;
+      margin: 0;
+      background-color: #28a745;
+    }
+    .flip-all-btn:hover { background-color: #1e7e34; }
+
     /* 卡背翻牌 */
     .card-wrap {
       position: relative;
@@ -295,7 +304,6 @@
 
     <button onclick="draw(1)">單抽</button>
     <button onclick="draw(10)">10 連抽</button>
-    <button onclick="flipAll()" style="background-color:#28a745;">全部翻開</button>
     <button class="reset" onclick="resetSim()">重置模擬器</button>
   </div>
 
@@ -615,7 +623,10 @@
               進行中輪次（第 ${startNum} ~ ${endNum} 抽）
               <span class="badge-slot" data-key="p">${isAchieved ? badgeHTML(count11262) : ''}</span>
             </span>
-            <span>進度：${currentPendingBatch.length} / ${batchSize}</span>
+            <span class="log-right">
+              <button class="flip-all-btn" onclick="flipBatch('p')">全部翻開</button>
+              <span>進度：${currentPendingBatch.length} / ${batchSize}</span>
+            </span>
           </div>
           <div class="card-grid">${renderCardGridHTML(currentPendingBatch)}</div>
         `;
@@ -637,7 +648,10 @@
               第 ${record.groupIndex} 輪紀錄（第 ${startNum} ~ ${endNum} 抽）
               <span class="badge-slot" data-key="${record.groupIndex}">${isAchieved ? badgeHTML(count11262) : ''}</span>
             </span>
-            <span>共 ${batchSize} 抽</span>
+            <span class="log-right">
+              <button class="flip-all-btn" onclick="flipBatch('${record.groupIndex}')">全部翻開</button>
+              <span>共 ${batchSize} 抽</span>
+            </span>
           </div>
           <div class="card-grid">${renderCardGridHTML(record.cards)}</div>
         `;
@@ -708,10 +722,16 @@
       refreshBadges();
     }
 
-    // 全部翻開
-    function flipAll() {
-      cardIndex.forEach(card => { card.flipped = true; });
-      document.querySelectorAll('.card-wrap').forEach(el => el.classList.add('flipped'));
+    // 翻開某一輪的全部卡片 (key: 'p' = 進行中輪次，或輪次編號)
+    function flipBatch(key) {
+      const cards = key === 'p'
+        ? currentPendingBatch
+        : (historyRecords.find(r => String(r.groupIndex) === String(key)) || {}).cards || [];
+      cards.forEach(card => {
+        card.flipped = true;
+        const el = document.querySelector(`.card-wrap[data-pull="${card.pullNumber}"]`);
+        if (el) el.classList.add('flipped');
+      });
       refreshBadges();
     }
 
