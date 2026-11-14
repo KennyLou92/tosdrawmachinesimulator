@@ -210,6 +210,46 @@
     .early-tag { color: #28a745; }
     .tag-partner { color: #6f42c1; }
 
+    /* 卡背翻牌 */
+    .card-wrap {
+      position: relative;
+      display: flex;
+      perspective: 700px;
+      cursor: pointer;
+    }
+    .card-flip {
+      position: relative;
+      flex: 1;
+      display: flex;
+      transform-style: preserve-3d;
+      transition: transform 0.5s;
+    }
+    .card-wrap.flipped .card-flip { transform: rotateY(180deg); }
+    .card-wrap .card-front,
+    .card-wrap .card-back {
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    .card-wrap .card-front {
+      width: 100%;
+      transform: rotateY(180deg);
+    }
+    .card-wrap .card-back {
+      position: absolute;
+      inset: 0;
+      border-radius: 6px;
+      overflow: hidden;
+      background: linear-gradient(135deg, #3a3f5c, #1b1d2b);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
+    .card-wrap .card-back img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 0;
+    }
+    .card-wrap:not(.flipped):hover .card-flip { transform: translateY(-2px); }
+
     /* 標題欄位的達標 Badge */
     .badge-11262-achieved {
       background-color: #6f42c1;
@@ -253,6 +293,7 @@
 
     <button onclick="draw(1)">單抽</button>
     <button onclick="draw(10)">10 連抽</button>
+    <button onclick="flipAll()" style="background-color:#28a745;">全部翻開</button>
     <button class="reset" onclick="resetSim()">重置模擬器</button>
   </div>
 
@@ -261,6 +302,7 @@
     <div id="historyLogs"></div>
   </div>
 
+  <script src="cardback.js"></script>
   <script>
     let poolData = [];
     let currentPool = null;
@@ -272,6 +314,9 @@
     const NO_PITY_BATCH_SIZE = 10;
     let guaranteeMonsterList = [];
     let partnerList = []; // partner 列表
+    let blackgoldList = []; // 使用黑金卡背的怪獸 ID
+    let customCardBackKey = null; // pool.json 的 customcardback
+    const cardIndex = new Map(); // pullNumber -> cardData
     let selectedPity = null;
     let autoSwitchEnabled = false;
 
@@ -288,6 +333,53 @@
     function getMonsterImgUrl(id) {
       const paddedId = String(id).padStart(4, '0');
       return `https://d1h5mn9kk900cf.cloudfront.net/toswebsites/gallery/icons/${paddedId}.jpg`;
+    }
+
+    function parseIdList(v) {
+      if (v === undefined || v === null || v === '') return [];
+      const arr = Array.isArray(v) ? v : String(v).split(',');
+      return arr.map(x => Number(String(x).trim())).filter(Number.isFinite);
+    }
+
+    // ===== 卡背 =====
+    // cardback.js 可能是 [{blackgold:"..."},{default:"..."}] 或 {blackgold:"...",default:"..."}
+    function getCardBackSource(key) {
+      if (typeof cardback === 'undefined' || !cardback) return null;
+      const list = Array.isArray(cardback) ? cardback : [cardback];
+      for (const o of list) {
+        if (o && typeof o[key] === 'string') return o[key];
+      }
+      return null;
+    }
+
+    // data URI 很大，轉成 blob URL 並快取，避免每次重繪都塞進 HTML
+    const backUrlCache = {};
+    function toBlobUrl(src) {
+      if (!src || !src.startsWith('data:')) return src;
+      if (backUrlCache[src]) return backUrlCache[src];
+      try {
+        const [meta, b64] = src.split(',');
+        const mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/png';
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return (backUrlCache[src] = URL.createObjectURL(new Blob([bytes], { type: mime })));
+      } catch (e) {
+        console.warn('卡背轉換失敗', e);
+        return src;
+      }
+    }
+
+    // 優先順序：blackgold 名單 > pool 的 customcardback > default
+    function getCardBackUrl(monsterId) {
+      let src = null;
+      if (blackgoldList.includes(monsterId)) src = getCardBackSource('blackgold');
+      if (!src && customCardBackKey) {
+        src = getCardBackSource(customCardBackKey)
+          || (/^(data:|https?:|\.?\/)/.test(customCardBackKey) ? customCardBackKey : null);
+      }
+      if (!src) src = getCardBackSource('default');
+      return toBlobUrl(src);
     }
 
     // 初始化讀取 pool.json
@@ -360,6 +452,13 @@
       } else {
         partnerList = [];
       }
+
+      // 解析 blackgold 列表 (相容字串、數字陣列)
+      blackgoldList = parseIdList(currentPool.blackgold);
+
+      // customcardback：沒有就用預設卡背
+      customCardBackKey = (typeof currentPool.customcardback === 'string' && currentPool.customcardback.trim())
+        ? currentPool.customcardback.trim() : null;
 
       selectedPity = guaranteeMonsterList[0] || null;
 
@@ -464,8 +563,10 @@
           pullNumber: totalPulls,
           monsterId: drawnId,
           isPity: isPityTriggered,
-          isEarly: isEarlyJackpot
+          isEarly: isEarlyJackpot,
+          flipped: false
         };
+        cardIndex.set(cardData.pullNumber, cardData);
 
         currentPendingBatch.push(cardData);
 
@@ -484,7 +585,7 @@
 
     // 計算指定批次中 11262 的數量
     function get11262Count(cards) {
-      return cards.filter(card => card.monsterId === 11262).length;
+      return cards.filter(card => card.flipped && card.monsterId === 11262).length;
     }
 
     // 更新與渲染 UI
@@ -510,7 +611,7 @@
           <div class="log-header">
             <span>
               進行中輪次（第 ${startNum} ~ ${endNum} 抽）
-              ${isAchieved ? `<span class="badge-11262-achieved">🎯 11262 達標 (${count11262}張)</span>` : ''}
+              <span class="badge-slot" data-key="p">${isAchieved ? badgeHTML(count11262) : ''}</span>
             </span>
             <span>進度：${currentPendingBatch.length} / ${batchSize}</span>
           </div>
@@ -532,7 +633,7 @@
           <div class="log-header">
             <span>
               第 ${record.groupIndex} 輪紀錄（第 ${startNum} ~ ${endNum} 抽）
-              ${isAchieved ? `<span class="badge-11262-achieved">🎯 11262 達標 (${count11262}張)</span>` : ''}
+              <span class="badge-slot" data-key="${record.groupIndex}">${isAchieved ? badgeHTML(count11262) : ''}</span>
             </span>
             <span>共 ${batchSize} 抽</span>
           </div>
@@ -542,12 +643,28 @@
       });
     }
 
+    function badgeHTML(n) {
+      return `<span class="badge-11262-achieved">🎯 11262 達標 (${n}張)</span>`;
+    }
+
+    function refreshBadges() {
+      document.querySelectorAll('.badge-slot').forEach(slot => {
+        const key = slot.dataset.key;
+        const cards = key === 'p'
+          ? currentPendingBatch
+          : (historyRecords.find(r => String(r.groupIndex) === key) || {}).cards || [];
+        const n = get11262Count(cards);
+        slot.innerHTML = n >= 3 ? badgeHTML(n) : '';
+      });
+    }
+
     function renderCardGridHTML(cards) {
       return cards.map(card => {
         const imgUrl = getMonsterImgUrl(card.monsterId);
+        const backUrl = getCardBackUrl(card.monsterId);
         const isGrand = guaranteeMonsterList.includes(card.monsterId);
         const isPartner = partnerList.includes(card.monsterId);
-        
+
         let tagHTML = '';
         if (card.isPity) {
           tagHTML = `<div class="card-tag pity-tag">[保底]</div>`;
@@ -565,13 +682,35 @@
         }
 
         return `
-          <div class="card-item ${borderClass}">
-            <img src="${imgUrl}" alt="${card.monsterId}">
-            <div class="id-label">${card.monsterId}</div>
-            ${tagHTML}
+          <div class="card-wrap ${card.flipped ? 'flipped' : ''}" data-pull="${card.pullNumber}" onclick="flipCard(${card.pullNumber})">
+            <div class="card-flip">
+              <div class="card-back">${backUrl ? `<img src="${backUrl}" alt="card back">` : ''}</div>
+              <div class="card-item card-front ${borderClass}">
+                <img src="${imgUrl}" alt="${card.monsterId}">
+                <div class="id-label">${card.monsterId}</div>
+                ${tagHTML}
+              </div>
+            </div>
           </div>
         `;
       }).join('');
+    }
+
+    // 翻開單張卡
+    function flipCard(pullNumber) {
+      const card = cardIndex.get(pullNumber);
+      if (!card || card.flipped) return;
+      card.flipped = true;
+      const el = document.querySelector(`.card-wrap[data-pull="${pullNumber}"]`);
+      if (el) el.classList.add('flipped');
+      refreshBadges();
+    }
+
+    // 全部翻開
+    function flipAll() {
+      cardIndex.forEach(card => { card.flipped = true; });
+      document.querySelectorAll('.card-wrap').forEach(el => el.classList.add('flipped'));
+      refreshBadges();
     }
 
     function resetSim(skipConfirm = false) {
@@ -584,6 +723,7 @@
       pityJackpotCount = 0;
       historyRecords = [];
       currentPendingBatch = [];
+      cardIndex.clear();
       if (guaranteeMonsterList.length > 0) {
         setPityTarget(guaranteeMonsterList[0]);
       }
